@@ -1,0 +1,15 @@
+# OPENAI API 키
+.env
+.env.*
+
+# python 가상환경
+.venv/
+venv/
+__pycache__/
+
+# OS 및 에디터 설정
+.vscode/
+.DS_Store
+
+# csv 파일
+*.csv

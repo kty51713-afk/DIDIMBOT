@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>디딤봇</title>
+</head>
+<style>
+    :root {
+        --primary-color: #3b82f6;
+        --bg-color: #f8fafc;
+        --chat-bg: #ffffff;
+        --user-bubble: #3b82f6;
+        --bot-bubble: #f1f5f9;
+        --sidebar-bg: #1e293b;
+        --text-main: #1e293b;
+        --text-muted: #64748b;
+    }
+
+    body {
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+        background-color: var(--bg-color);
+        margin: 0;
+        display: flex;
+        height: 100vh;
+        /*vh:창 크기에 맞춰 유동적 margin, padding에 따라 100을 초과할 수도 있음. */
+        overflow: hidden;
+        color: var(--text-main);
+    }
+
+    /* --- 사이드바 --- */
+    .side {
+        width: 280px;
+        background-color: var(--sidebar-bg);
+        color: white;
+        display: flex;
+        flex-direction: column;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        z-index: 100;
+    }
+
+    .side.collapsed {
+        width: 0;
+        min-width: 0 !important;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .side-header {
+        padding: 24px;
+        font-size: 22px;
+        font-weight: bold;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .questionList {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+    }
+
+    .questionBox {
+        width: 100%;
+        display: block;
+        padding: 12px 16px;
+        margin-bottom: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        box-sizing: border-box;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.2s;
+        overflow: hidden;
+        overflow-y: auto;
+        /* 리스트가 길어지면 스크롤 발생 */
+        min-height: 0;
+        /* 중요: flex 자식 요소에서 스크롤이 작동하게 함 */
+    }
+
+    .questionBox:hover {
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .questionText {
+        display: -webkit-box;
+        /* 유연한 박스 모델 사용 : 멀티라인 말줄임*/
+        -webkit-box-orient: vertical;
+        /* 박스의 방향을 세로로 설정 */
+        -webkit-line-clamp: 1;
+        /* 보여줄 줄 수 (1줄로 제한) */
+        width: 100%;
+        text-align: left;
+        font-size: 16px;
+        color: rgba(255, 255, 255, 0.8);
+        /* 글자색을 살짝 흐리게 하면 더 고급스러움 */
+        max-height: 20px;
+        /* 텍스트 상자 자체 높이 고정 */
+        line-height: 20px;
+        /* 박스 높이와 줄 높이를 똑같이 맞춤 */
+        word-break: break-all;
+        /* 너무 긴 단어도 강제로 줄바꿈해서 체크하도록 함 */
+        overflow: hidden;
+        text-overflow: ellipsis;
+        /*글자가 넘치면 말줄임표*/
+        margin: 0;
+    }
+
+    /* --- 메인 컨텐츠 --- */
+    .main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        /* 화면 전체 높이를 명시적으로 고정 */
+        overflow: hidden;
+        /* 메인 컨텐츠 자체는 스크롤되지 않게 함 */
+    }
+
+    header {
+        height: 60px;
+        background: white;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .sideBtn {
+        background: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 5px 10px;
+        cursor: pointer;
+        margin-right: 15px;
+        font-size: 18px;
+    }
+
+    .chatBox {
+        flex: 1;
+        padding: 30px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        scroll-behavior: smooth;
+        min-height: 0;
+    }
+
+    /* --- 말풍선 스타일 --- */
+    .userChat,
+    .botChat {
+        max-width: 70%;
+        padding: 12px 18px;
+        border-radius: 18px;
+        font-size: 16px;
+        line-height: 1.6;
+        position: relative;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        word-break: break-all;
+        /* 텍스트가 박스 끝에 도달하면 글자 단위로 강제 줄바꿈 */
+        overflow-wrap: break-word;
+        /* 긴 단어가 박스를 뚫고 나가지 않도록 방지 */
+    }
+
+    .userChat {
+        align-self: flex-end;
+        background-color: var(--user-bubble);
+        color: white;
+        border-bottom-right-radius: 2px;
+        scroll-margin-top: 10px;
+    }
+
+    .botChat {
+        align-self: flex-start;
+        background-color: var(--bot-bubble);
+        color: var(--text-main);
+        border-bottom-left-radius: 2px;
+    }
+
+    /* --- 입력 섹션 --- */
+    .inputSection {
+        padding: 24px;
+        background: white;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: center;
+    }
+
+    .input-container {
+        width: 100%;
+        max-width: 800px;
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        background: #f8fafc;
+        padding: 8px 16px;
+        border-radius: 24px;
+        border: 1px solid #e2e8f0;
+        transition: border-color 0.2s;
+    }
+
+    .input-container:focus-within {
+        border-color: var(--primary-color);
+        background: white;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    #chatInput {
+        flex: 1;
+        border: none;
+        background: transparent;
+        outline: none;
+        padding: 10px 0;
+        font-size: 16px;
+        resize: none;
+        /*textarea : 마우스로 입력창 크기 조절 가능 --> none = 고정하겠다*/
+        max-height: 150px;
+        min-height: 24px;
+    }
+
+    #inputBtn {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s, background 0.2s;
+    }
+
+    #inputBtn:hover {
+        background: #2563eb;
+        transform: scale(1.05);
+    }
+
+    /* 스크롤바 커스텀 */
+    .chatBox::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .chatBox::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+    }
+</style>
+</head>
+
+<body>
+
+    <div class="side" id="sidebar">
+        <div class="side-header">
+            <span>상담 기록</span>
+        </div>
+        <div class="questionList" id="questionList"></div>
+    </div>
+
+    <div class="main-content">
+        <header>
+            <button class="sideBtn">≡</button>
+            <h2 style="font-size: 18px; margin:0;">디딤봇 : 장애인 취업 지원 시스템</h2>
+        </header>
+
+        <div class="chatBox" id="chatBox">
+            <div class="botChat">안녕하세요! 취업 상담 및 컨설팅을 도와드리는 디딤봇입니다. 궁금하신 내용을 입력해주세요.</div>
+            <div class="botChat">장애유형, 장애등급, 보유역량, 업무 시 고려해야 할 신체적/환경적 제약을 적어주시면 보다 정확한 답변을 얻으실 수 있습니다.</div>
+        </div>
+
+        <div class="inputSection">
+            <div class="input-container">
+                <!--input은 1줄만, 입력창 크기를 유동적으로 사용하려면 textarea-->
+                <textarea id="chatInput" placeholder="메시지를 입력하세요..." rows="1"></textarea>
+                <button id="inputBtn">
+                    <!--종이비행기 모양. 전송버튼 이미지-->
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
+<script>
+    // 공통변수 설정
+    const BASE_URL = "http://localhost:8000";
+    const chatInput = document.getElementById("chatInput")
+    const inputBtn = document.getElementById("inputBtn")
+    const chatBox = document.querySelector(".chatBox")
+    const questionList = document.querySelector(".questionList")
+
+    let chats = []          // 질문과 답변이 모두 들어간 리스트
+    let questions = []      // 질문만 들어간 리스트 : 사이드 바에 사용
+
+    // 유저 채팅 리스트에 추가 : '키:값' 객체형태로 리스트에 집어넣기
+    function addChat(chat, classname) {
+        const chatId = "chat-" + Date.now() + Math.random().toString(36).substr(2, 9)    // 고유 ID 생성
+        chats.push({ id: chatId, text: chat, type: classname })
+        return chatId
+    }
+
+    // 질문 리스트 만들기
+    function addQuestion(chat, chatId) {
+        questions.push({ text: chat, id: chatId })
+    }
+
+    // 챗봇 질문 동작
+    async function question() {
+        const chat = chatInput.value;
+        if (!chat.trim()) return;
+
+        // 1. 유저 질문을 먼저 화면에 추가 (이 시점에 chats에 유저 질문이 들어감)
+        const chatId = addChat(chat, "userChat");
+        addQuestion(chat, chatId);
+        render();
+
+        chatInput.value = "";
+        chatInput.style.height = '54px';
+
+        // 2. 중요: answer 함수에 현재까지 쌓인 'chats' 배열을 인자로 넘김
+        // 이때 slice(0, -1)를 쓰지 않는 이유는 방금 추가한 질문까지 포함해서 보내야 맥락 파악이 잘 되기 때문입니다.
+        const answerText = await answer(chat, chats);
+
+        addChat(answerText, "botChat");
+        render();
+    }
+
+    // 랜더링
+    function render(chat, classname) {
+        chatBox.innerText = ""        // 챗봇 부분 화면 초기화
+        questionList.innerHTML = ""   // 질문 목록 화면 초기화
+
+        chats.forEach(chat => {
+            const userChat = document.createElement("div")  // 유저 채팅창 추가
+            userChat.className = chat.type  // css를 쓰기 위해서 클래스 네임 설정
+            userChat.innerText = chat.text  // 사용자가 입력한 값 표출
+            userChat.id = chat.id           // 만들어진 유저 채팅창에 고유 ID 부여(스크롤 타겟용) --> 이때의 id는 키 값이 아니라 태그임
+            chatBox.appendChild(userChat)   // 채팅박스 안에 유저 채팅 포함
+
+        })
+
+        // 사이드바 질문 목록
+        questions.forEach(chat => {
+            // 질문목록 칸 만들기
+            const userQuestion = document.createElement("div")
+            userQuestion.className = "questionBox"
+            userQuestion.style.cursor = "pointer"
+
+            // 질문목록 칸안에 글자 = 글자에 css를 따로 적용하기 위해 만듦
+            const questionText = document.createElement("span")
+            questionText.className = "questionText"
+            questionText.innerText = chat.text.trim()
+            userQuestion.appendChild(questionText)
+
+            // 클릭하면 질문으로 이동하도록 하는 이벤트 함수 호출
+            userQuestion.addEventListener("click", () => {
+                goChat(chat.id)
+            })
+            // 화면 출력
+            questionList.appendChild(userQuestion)
+        })
+        chatBox.scrollTop = chatBox.scrollHeight    // 스크롤 맨 아래 유지
+    }
+
+    // 채팅창 슬라이드, 사이드바에서 질문을 누르면 해당 위치로 이동
+    function goChat(id) {
+        const target = document.getElementById(id)  // 이때 매개변수의 id는 question의 userId의 키
+        if (target) {
+            target.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+    }
+
+    // 사이드 접었다 펴기
+    function toggleSidebar() {
+        const side = document.querySelector(".side")
+        side.classList.toggle("collapsed");
+    }
+
+    // 챗봇 LLM 응답 불러오기
+    async function answer(chat, history) {
+        try {
+            const response = await fetch(BASE_URL + "/messages", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                // body에 history를 추가해서 서버로 전송(이때 history는 chats 리스트 전체를 의미)
+                body: JSON.stringify({
+                    query: chat,
+                    history: history
+                })
+            })
+
+            const data = await response.json()
+            return data.answer
+
+        } catch (e) {
+            addChat("서버 오류", "bot")
+        }
+    }
+
+    // 채팅 입력 칸 높이 자동 조절 + 스크롤 제어(최대 크기 넘어가면 스크롤 생성)
+    chatInput.addEventListener("input", () => {
+        // chatInput.style.height = "auto"
+        chatInput.style.height = '0px';
+        let scrollHeight = chatInput.scrollHeight
+        if (scrollHeight <= 150) {
+            // 150px 이하일 때는 내용을 높이만큼 키우고 스크롤바 숨김
+            chatInput.style.height = scrollHeight + "px"
+            chatInput.overflowY = 'hidden'
+        } else {
+            // 150px 넘어가면 높이 고정, 스크롤바 표시
+            chatInput.style.height = '150px'
+            chatInput.style.overflow = 'auto'
+        }
+    })
+
+
+    // 이벤트 처리 : 마우스 클릭 + 엔터로 사용자 입력 / shift+enter 줄바꿈
+    inputBtn.addEventListener("click", question)
+    chatInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            if (e.shiftKey) {
+                // 줄바꿈 허용
+                return
+            } else {
+                e.preventDefault()  // 줄바꿈 막기
+                question()
+            }
+        }
+    })
+    document.querySelector(".sideBtn").addEventListener("click", toggleSidebar);
+
+    // 실행
+    //question()
+    // 난 지금 다리가 불편하지만 속기는 잘해 직업 추천좀
+
+
+</script>
